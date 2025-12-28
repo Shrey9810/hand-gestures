@@ -57,7 +57,7 @@ brightness_anchor_scale = None
 BRIGHTNESS_SENSITIVITY = 400 
 # Tiny Deadzone
 BRIGHTNESS_DEADZONE = 0.005  
-BRIGHTNESS_RANGE = 0.05
+BRIGHTNESS_RANGE = 0.12
 # 🔒 Safety Cap: Max 1% change per frame (Butter smooth)
 MAX_BRIGHTNESS_STEP = 15      
 
