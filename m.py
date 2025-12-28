@@ -14,8 +14,8 @@ BASE_SMOOTHING = 3
 FRAME_MARGIN = 80
 
 # Click timings
-MIDDLE_CLICK_HOLD_TIME = 0.3      # Hold middle finger up for 0.3s for single click
-FIST_HOLD_TIME = 0.7              # Hold fist for 0.7s for double click
+MIDDLE_CLICK_HOLD_TIME = 0.5      # Hold middle finger up for 0.3s for single click
+FIST_HOLD_TIME = 0.5              # Hold fist for 0.7s for double click
 OPEN_HAND_HOLD_TIME = 0.5         # Hold open hand for 0.5s for right click
 
 # Scroll settings
@@ -70,7 +70,6 @@ hands = mp_hands.Hands(
     min_detection_confidence=0.7,
     min_tracking_confidence=0.7
 )
-mp_drawing = mp.solutions.drawing_utils
 
 # ================= ENHANCED UTILS =================
 def get_dist(p1, p2):
@@ -251,19 +250,15 @@ def handle_middle_click_gesture():
     if not middle_click_done:
         hold_time = current_time - middle_click_start_time
         
-        # Show timer feedback
-        progress = min(hold_time / MIDDLE_CLICK_HOLD_TIME, 1.0)
-        
         # Trigger single click after hold time
         if hold_time >= MIDDLE_CLICK_HOLD_TIME:
-            print("✓ Single Click (Middle Finger)")
             pyautogui.click()
             middle_click_done = True
             
             # Small delay to avoid immediate re-trigger
             time.sleep(0.2)
     
-    return progress
+    return min(hold_time / MIDDLE_CLICK_HOLD_TIME, 1.0)
 
 def handle_scroll_mode(hand, w, h):
     """Handle smooth scrolling"""
@@ -306,19 +301,15 @@ def handle_fist_gesture():
     if not fist_action_done:
         hold_time = current_time - fist_start_time
         
-        # Show timer feedback
-        progress = min(hold_time / FIST_HOLD_TIME, 1.0)
-        
         # Trigger double click after hold time
         if hold_time >= FIST_HOLD_TIME:
-            print("✓ Double Click (Fist)")
             pyautogui.doubleClick()
             fist_action_done = True
             
             # Small delay to avoid immediate re-trigger
             time.sleep(0.3)
     
-    return progress
+    return min(hold_time / FIST_HOLD_TIME, 1.0)
 
 def handle_open_hand_gesture():
     """Handle open hand gesture for right click"""
@@ -329,19 +320,15 @@ def handle_open_hand_gesture():
     if not open_hand_action_done:
         hold_time = current_time - open_hand_start_time
         
-        # Show timer feedback
-        progress = min(hold_time / OPEN_HAND_HOLD_TIME, 1.0)
-        
         # Trigger right click after hold time
         if hold_time >= OPEN_HAND_HOLD_TIME:
-            print("✓ Right Click (Open Hand)")
             pyautogui.rightClick()
             open_hand_action_done = True
             
             # Small delay to avoid immediate re-trigger
             time.sleep(0.3)
     
-    return progress
+    return min(hold_time / OPEN_HAND_HOLD_TIME, 1.0)
 
 def determine_gesture(hand):
     """Determine current gesture with improved detection"""
@@ -379,6 +366,14 @@ def mouse_loop():
     global open_hand_start_time, open_hand_detected, open_hand_action_done
     
     cap = cv2.VideoCapture(0)
+    
+    # Set camera properties for better performance
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+    
+    print("Hand control system started successfully!")
+    print("Running in background... Use tray icon to exit.")
     
     while running:
         ret, frame = cap.read()
@@ -434,105 +429,6 @@ def mouse_loop():
                 active_mode = new_mode
                 last_mode_switch = current_time
             
-            # Draw hand landmarks
-            mp_drawing.draw_landmarks(
-                frame, hand, mp_hands.HAND_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2),
-                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
-            )
-            
-            # Highlight middle finger if it's active
-            if active_mode == "MIDDLE_CLICK":
-                middle_x = int(hand.landmark[12].x * w)
-                middle_y = int(hand.landmark[12].y * h)
-                cv2.circle(frame, (middle_x, middle_y), 20, (0, 255, 255), -1)
-                cv2.circle(frame, (middle_x, middle_y), 20, (255, 255, 255), 2)
-            
-            # Draw mode and velocity indicator
-            cv2.putText(frame, f"Mode: {active_mode}", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(frame, f"Speed: {velocity:.1f}", (10, 60),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-            
-            # Draw virtual screen boundary
-            cv2.rectangle(frame, 
-                         (FRAME_MARGIN, FRAME_MARGIN),
-                         (w - FRAME_MARGIN, h - FRAME_MARGIN),
-                         (255, 200, 0), 2)
-            
-            # Draw gesture timer if in gesture mode
-            if active_mode == "FIST" and fist_detected and not fist_action_done:
-                progress = (current_time - fist_start_time) / FIST_HOLD_TIME
-                progress = min(progress, 1.0)
-                
-                # Draw timer bar
-                bar_width = int(w * 0.3)
-                bar_height = 15
-                bar_x = w // 2 - bar_width // 2
-                bar_y = h - 50
-                
-                # Color gradient: yellow -> orange -> red
-                if progress < 0.5:
-                    color = (0, int(255 * (progress * 2)), 255)  # Yellow to Orange
-                else:
-                    color = (0, int(255 * (1 - (progress - 0.5) * 2)), 255)  # Orange to Red
-                
-                cv2.rectangle(frame, (bar_x, bar_y), 
-                             (bar_x + int(bar_width * progress), bar_y + bar_height),
-                             color, -1)
-                cv2.rectangle(frame, (bar_x, bar_y), 
-                             (bar_x + bar_width, bar_y + bar_height),
-                             (255, 255, 255), 2)
-                
-                cv2.putText(frame, "Double Click", (bar_x, bar_y - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
-            elif active_mode == "OPEN_HAND" and open_hand_detected and not open_hand_action_done:
-                progress = (current_time - open_hand_start_time) / OPEN_HAND_HOLD_TIME
-                progress = min(progress, 1.0)
-                
-                # Draw timer bar
-                bar_width = int(w * 0.3)
-                bar_height = 15
-                bar_x = w // 2 - bar_width // 2
-                bar_y = h - 50
-                
-                # Color: green gradient
-                color = (0, int(255 * progress), 0)  # Green gradient
-                
-                cv2.rectangle(frame, (bar_x, bar_y), 
-                             (bar_x + int(bar_width * progress), bar_y + bar_height),
-                             color, -1)
-                cv2.rectangle(frame, (bar_x, bar_y), 
-                             (bar_x + bar_width, bar_y + bar_height),
-                             (255, 255, 255), 2)
-                
-                cv2.putText(frame, "Right Click", (bar_x, bar_y - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
-            elif active_mode == "MIDDLE_CLICK" and middle_detected and not middle_click_done:
-                progress = (current_time - middle_click_start_time) / MIDDLE_CLICK_HOLD_TIME
-                progress = min(progress, 1.0)
-                
-                # Draw timer bar
-                bar_width = int(w * 0.3)
-                bar_height = 15
-                bar_x = w // 2 - bar_width // 2
-                bar_y = h - 50
-                
-                # Color: blue gradient
-                color = (255, int(255 * (1 - progress)), 0)  # Blue gradient
-                
-                cv2.rectangle(frame, (bar_x, bar_y), 
-                             (bar_x + int(bar_width * progress), bar_y + bar_height),
-                             color, -1)
-                cv2.rectangle(frame, (bar_x, bar_y), 
-                             (bar_x + bar_width, bar_y + bar_height),
-                             (255, 255, 255), 2)
-                
-                cv2.putText(frame, "Single Click", (bar_x, bar_y - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
             # Execute mode-specific actions
             if active_mode == "CURSOR":
                 handle_cursor_mode(hand, w, h)
@@ -561,15 +457,9 @@ def mouse_loop():
                     active_mode = "NONE"
                     open_hand_detected = False
         
-        # Display frame
-        cv2.imshow('Enhanced Hand Control', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            running = False
-        
         time.sleep(0.01)
 
     cap.release()
-    cv2.destroyAllWindows()
 
 # ================= TRAY =================
 def exit_app(icon, _):
@@ -586,49 +476,19 @@ def tray_menu():
 if __name__ == "__main__":
     print("Starting Enhanced Hand Control v6...")
     print("\n" + "="*50)
-    print("NEW GESTURE GUIDE (MIDDLE FINGER FOR CLICK):")
+    print("BACKGROUND MODE - NO CAMERA WINDOW")
     print("="*50)
-    print("\n1. CURSOR MOVEMENT:")
-    print("   • Show INDEX finger only 👆")
-    print("   • Move hand to move cursor")
-    print("   • Fast movement = Quick navigation")
-    print("   • Slow movement = Precise targeting")
-    
-    print("\n2. SINGLE LEFT CLICK:")
-    print("   • Show MIDDLE finger only 🖕")
-    print("   • Hold for 0.3 seconds")
-    print("   • Blue timer bar will show progress")
-    print("   • Releases automatically when timer completes")
-    
-    print("\n3. SCROLL:")
-    print("   • Show PEACE SIGN ✌️ (index + middle)")
-    print("   • Move hand up/down to scroll")
-    print("   • Natural scrolling: hand up = scroll up")
-    
-    print("\n4. DOUBLE CLICK:")
-    print("   • Make a FIST ✊")
-    print("   • Hold for 0.7 seconds")
-    print("   • Yellow→red timer bar will show progress")
-    
-    print("\n5. RIGHT CLICK:")
-    print("   • Show OPEN HAND 🖐️ (all fingers extended)")
-    print("   • Hold for 0.5 seconds")
-    print("   • Green timer bar will show progress")
-    
-    print("\n" + "="*50)
-    print("IMPORTANT NOTES:")
+    print("\nGESTURE GUIDE:")
+    print("1. 👆 Index finger = CURSOR MOVEMENT")
+    print("2. 🖕 Middle finger = Single Click (hold 0.3s)")
+    print("3. ✌️ Peace sign = Scroll")
+    print("4. ✊ Fist = Double Click (hold 0.7s)")
+    print("5. 🖐️ Open hand = Right Click (hold 0.5s)")
+    print("\nSTATUS: Running in background")
+    print("• Look for tray icon in system tray")
+    print("• Right-click tray icon to exit")
+    print("• System will automatically detect your hand gestures")
     print("="*50)
-    print("• Keep hand within the yellow rectangle")
-    print("• For middle finger click: Make sure only MIDDLE is up")
-    print("• For fist: Curl ALL fingers (including thumb)")
-    print("• For open hand: Extend ALL fingers")
-    print("• Good lighting helps detection")
-    print("• Minimize this window to run in background")
-    print("• Press 'q' in camera window to quit")
-    
-    print("\nGesture Priority (if multiple gestures detected):")
-    print("1. Fist ✊ → 2. Open Hand 🖐️ → 3. Middle Finger 🖕 →")
-    print("4. Peace Sign ✌️ → 5. Index Finger 👆")
     
     t = threading.Thread(target=mouse_loop, daemon=True)
     t.start()
